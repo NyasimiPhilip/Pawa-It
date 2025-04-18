@@ -4,10 +4,10 @@ from typing import List, Optional
 import uuid
 from datetime import datetime
 
-from app.core.security import generate_request_id
+from app.core.security import generate_request_id, get_current_user
 from app.models.schema import QuestionRequest, QuestionResponse, HistoryResponse, HistoryItem
 from app.services.llm_service import llm_service
-from app.db.database import get_db, QueryHistory
+from app.db.database import get_db, QueryHistory, User
 
 router = APIRouter(tags=["qa"])
 
@@ -17,7 +17,11 @@ async def health_check():
     return {"status": "healthy", "service": "Q&A API"}
 
 @router.post("/ask", response_model=QuestionResponse, status_code=status.HTTP_200_OK)
-async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
+async def ask_question(
+    request: QuestionRequest, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
     Ask a question to the LLM and get a response
     
@@ -37,12 +41,13 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
                 detail=result.get("error", "Failed to get response from LLM")
             )
         
-        # Save to history
+        # Save to history with user_id
         history_entry = QueryHistory(
             id=str(uuid.uuid4()),
             question=request.question,
             answer=result["answer"],
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            user_id=current_user.id  # Associate with the current user
         )
         db.add(history_entry)
         db.commit()
@@ -69,16 +74,19 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
 async def get_history(
     limit: int = Query(10, ge=1, le=100), 
     skip: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Get the history of questions and answers
+    Get the history of questions and answers for the current user
     
     - **limit**: Maximum number of items to return (1-100)
     - **skip**: Number of items to skip (pagination)
     """
-    # Query the database for history
-    query = db.query(QueryHistory).order_by(QueryHistory.timestamp.desc())
+    # Query the database for history, filtering by user_id
+    query = db.query(QueryHistory).filter(QueryHistory.user_id == current_user.id) \
+              .order_by(QueryHistory.timestamp.desc())
+    
     total = query.count()
     items = query.offset(skip).limit(limit).all()
     

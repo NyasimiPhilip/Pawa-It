@@ -1,8 +1,9 @@
 # main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import qa
+from app.api.endpoints import qa, auth
 from app.core.config import settings
+from app.db.database import init_db
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -23,7 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize database
+init_db()
+
 # Include routers
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth")
 app.include_router(qa.router, prefix=settings.API_V1_STR)
 
 if __name__ == "__main__":

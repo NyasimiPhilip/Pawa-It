@@ -2,6 +2,7 @@ import os
 from pydantic_settings import BaseSettings
 from typing import List
 from dotenv import load_dotenv
+import secrets
 
 load_dotenv()
 
@@ -17,6 +18,11 @@ class Settings(BaseSettings):
     
     # LLM settings
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    
+    # Security settings
+    SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
     # Database settings
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")

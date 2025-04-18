@@ -1,8 +1,53 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
 
+# User schemas
+class UserBase(BaseModel):
+    email: EmailStr
+    username: str
+
+class UserCreate(UserBase):
+    password: str
+    
+    @validator('password')
+    def password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        return v
+    
+    @validator('username')
+    def username_valid(cls, v):
+        if len(v) < 3:
+            raise ValueError('Username must be at least 3 characters')
+        return v
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(UserBase):
+    id: str
+    is_active: bool
+    created_at: datetime
+    
+    class Config:
+        orm_mode = True
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    user_id: Optional[str] = None
+
+# Question schemas
 class QuestionRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000, description="The user's question")
     context: Optional[str] = Field(None, description="Optional context for the question")
