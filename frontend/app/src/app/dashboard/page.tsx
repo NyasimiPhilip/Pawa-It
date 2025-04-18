@@ -11,15 +11,39 @@ type Message = {
   type: 'user' | 'ai';
   content: string;
   timestamp: Date;
+  isTyping?: boolean;
+};
+
+// TypewriterText component
+const TypewriterText = ({ text, onComplete }: { text: string; onComplete: () => void }) => {
+  const [displayText, setDisplayText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex < text.length) {
+      const timeout = setTimeout(() => {
+        setDisplayText(prev => prev + text[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, 1); // Adjust typing speed here (milliseconds)
+
+      return () => clearTimeout(timeout);
+    } else {
+      onComplete();
+    }
+  }, [currentIndex, text, onComplete]);
+
+  return <div className="whitespace-pre-line">{displayText}</div>;
 };
 
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [questionInput, setQuestionInput] = useState('');
+  const [contextInput, setContextInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showContext, setShowContext] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -77,19 +101,23 @@ export default function Dashboard() {
       { 
         id: placeholderId, 
         type: 'ai', 
-        content: '...', 
-        timestamp: new Date() 
+        content: '', 
+        timestamp: new Date(),
+        isTyping: true
       }
     ]);
     
     try {
-      const result = await askQuestion({ question: userMessage.content });
+      const result = await askQuestion({ 
+        question: userMessage.content,
+        context: contextInput.trim() || undefined
+      });
       
       // Replace placeholder with actual response
       setMessages(prev => 
         prev.map(msg => 
           msg.id === placeholderId 
-            ? { ...msg, content: result.answer } 
+            ? { ...msg, content: result.answer, isTyping: true } 
             : msg
         )
       );
@@ -102,7 +130,7 @@ export default function Dashboard() {
       setMessages(prev => 
         prev.map(msg => 
           msg.id === placeholderId 
-            ? { ...msg, content: 'Sorry, I encountered an error while processing your request.' } 
+            ? { ...msg, content: 'Sorry, I encountered an error while processing your request.', isTyping: true } 
             : msg
         )
       );
@@ -246,12 +274,25 @@ export default function Dashboard() {
                       }
                     `}
                   >
-                    {message.type === 'ai' && message.content === '...' ? (
+                    {message.type === 'ai' && message.content === '' ? (
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></div>
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
                       </div>
+                    ) : message.type === 'ai' && message.isTyping ? (
+                      <TypewriterText 
+                        text={message.content} 
+                        onComplete={() => {
+                          setMessages(prev =>
+                            prev.map(msg =>
+                              msg.id === message.id
+                                ? { ...msg, isTyping: false }
+                                : msg
+                            )
+                          );
+                        }}
+                      />
                     ) : (
                       <div className="whitespace-pre-line">{message.content}</div>
                     )}
@@ -264,7 +305,46 @@ export default function Dashboard() {
         
         {/* Input area */}
         <div className="border-t border-gray-700 bg-[#1e1e1e] p-4">
-          <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+          <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-4">
+            {/* Context toggle button */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowContext(!showContext)}
+                className="text-sm text-gray-400 hover:text-gray-200 flex items-center gap-2"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`transform transition-transform ${showContext ? 'rotate-180' : ''}`}
+                >
+                  <path d="M18 15l-6-6-6 6"/>
+                </svg>
+                {showContext ? 'Hide Context' : 'Add Context'}
+              </button>
+            </div>
+
+            {/* Context input */}
+            {showContext && (
+              <div className="relative rounded-lg border border-gray-600 overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-blue-500">
+                <textarea
+                  value={contextInput}
+                  onChange={(e) => setContextInput(e.target.value)}
+                  placeholder="Add context for your question (optional)..."
+                  className="w-full px-4 py-3 bg-gray-800 text-gray-200 focus:outline-none placeholder-gray-500 resize-y min-h-[100px]"
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
+
+            {/* Question input */}
             <div className="relative rounded-full border border-gray-600 overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-blue-500">
               <input
                 type="text"
