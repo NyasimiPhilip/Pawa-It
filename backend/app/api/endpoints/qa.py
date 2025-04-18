@@ -90,14 +90,14 @@ async def get_history(
     total = query.count()
     items = query.offset(skip).limit(limit).all()
     
-    # Convert to Pydantic models
+    # Convert to Pydantic models and ensure id is a string
     history_items = [
         HistoryItem(
-            id=item.id,
+            id=str(item.id),  # Convert UUID to string explicitly
             question=item.question,
             answer=item.answer,
             timestamp=item.timestamp
         ) for item in items
     ]
-    
+
     return HistoryResponse(items=history_items, count=total)
