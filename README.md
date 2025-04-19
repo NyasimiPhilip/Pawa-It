@@ -2,8 +2,6 @@
 
 A full-stack AI-powered Q&A application that provides intelligent answers with context support. Built with Next.js for the frontend and FastAPI for the backend.
 
-![Project Banner](frontend/app/public/background.svg)
-
 ## 🌟 Features
 
 ### Core Features
